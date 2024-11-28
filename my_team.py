@@ -579,3 +579,4 @@ class DefensiveExpectimaxAgent(ExpectimaxAgent):
         else:
             self.goals = {"patrol": 1, "flee_pacmans": 100, "stay_at_home": 10000}
 
+#
