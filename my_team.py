@@ -115,6 +115,7 @@ class ExpectimaxAgent(CaptureAgent):
 
     def analize_state(self, game_state):
         self.set_boundary(game_state)
+        self.set_subboundary(game_state)
         self.set_patrol_focuses(game_state)
 
     def default_preferences(self, game_state):
@@ -254,30 +255,52 @@ class ExpectimaxAgent(CaptureAgent):
             return 0
         return min(distances) + extra
 
-    def min_distance_observables(self, game_state, filtrum):
-        agents = filter(filtrum, self.observable_agents(game_state))
-        positions = list(map(lambda a: a.get_position(), agents))
+    def min_distance_observable_pacmans(self, game_state):
+        agents = [game_state.get_agent_state(i) for i in self.opponent_indices]
+        positions = [a.get_position() for a in agents if a.get_position() != None and a.is_pacman == True]
         return self.min_distance(game_state, positions, self.extra_distance)
 
-    def min_distance_observable_all(self, game_state):
-        filtrum = lambda a: True
-        return self.min_distance_observables(game_state, filtrum)
-
-    def min_distance_observable_pacmans(self, game_state):
-        filtrum = lambda a: a.is_pacman
-        return self.min_distance_observables(game_state, filtrum)
-
     def min_distance_observable_ghosts(self, game_state):
-        filtrum = lambda a: not a.is_pacman
-        return self.min_distance_observables(game_state, filtrum)
+        agents = [game_state.get_agent_state(i) for i in self.opponent_indices]
+        positions = [a.get_position() for a in agents if a.get_position() != None and a.is_pacman == False]
+        return self.min_distance(game_state, positions, self.extra_distance)
 
     def min_distance_observable_daring_ghosts(self, game_state):
-        filtrum = lambda a: not a.is_pacman and a.scared_timer == 0
-        return self.min_distance_observables(game_state, filter_fn)
+        agents = [game_state.get_agent_state(i) for i in self.opponent_indices]
+        positions = [a.get_position() for a in agents if a.get_position() != None and a.is_pacman == False and a.scared_timer <= 0]
+        return self.min_distance(game_state, positions, self.extra_distance)
 
     def min_distance_observable_scared_ghosts(self, game_state):
-        filtrum = lambda a: not a.is_pacman and a.scared_timer > 0
-        return self.min_distance_observables(game_state, filtrum)
+        agents = [game_state.get_agent_state(i) for i in self.opponent_indices]
+        positions = [a.get_position() for a in agents if a.get_position() != None and a.is_pacman == False and a.scared_timer > 0]
+        return self.min_distance(game_state, positions, self.extra_distance)
+
+
+#
+#    def min_distance_observables(self, game_state, filtrum):
+#        agents = list(filter(filtrum, self.observable_agents(game_state)))
+#        positions = list(map(lambda a: a.get_position(), agents))
+#        return self.min_distance(game_state, positions, self.extra_distance)
+#
+#    def min_distance_observable_all(self, game_state):
+#        filtrum = lambda a: True
+#        return self.min_distance_observables(game_state, filtrum)
+#
+#    def min_distance_observable_pacmans(self, game_state):
+#        filtrum = lambda a: a.is_pacman
+#        return self.min_distance_observables(game_state, filtrum)
+#
+#    def min_distance_observable_ghosts(self, game_state):
+#        filtrum = lambda a: a.is_pacman == False
+#        return self.min_distance_observables(game_state, filtrum)
+#
+#    def min_distance_observable_daring_ghosts(self, game_state):
+#        filtrum = lambda a: (a.is_pacman == False) and (a.scared_timer <= 0)
+#        return self.min_distance_observables(game_state, filtrum)
+#
+#    def min_distance_observable_scared_ghosts(self, game_state):
+#        filtrum = lambda a: (a.is_pacman == False) and (a.scared_timer > 0)
+#        return self.min_distance_observables(game_state, filtrum)
 
     def min_distance_food(self, game_state):
         positions = self.get_food(game_state).as_list()
@@ -303,6 +326,10 @@ class ExpectimaxAgent(CaptureAgent):
         positions = self.boundary
         return self.min_distance(game_state, positions)
 
+    def min_distance_subboundary(self, game_state):
+        positions = self.subboundary
+        return self.min_distance(game_state, positions)
+
     #
     # Cantidades
     #
@@ -322,6 +349,11 @@ class ExpectimaxAgent(CaptureAgent):
     def num_cocos(self, game_state):
         return len(self.get_food(game_state).as_list() + self.get_capsules(game_state))
 
+    def clap(self, distance):
+        if distance > self.radius:
+            return 0
+        return distance
+
     #
     # Posiciones
     #
@@ -338,6 +370,20 @@ class ExpectimaxAgent(CaptureAgent):
         x = game_state.data.layout.width // 2
         if self.red:
             x = x - 1
+        return x
+
+    def set_subboundary(self, game_state):
+        x = self.get_subboundary_x(game_state)
+        ys = list(range(game_state.data.layout.height))
+        self.subboundary = []
+        for y in ys:
+            if not game_state.has_wall(x, y):
+             self.subboundary.append((x, y))
+
+    def get_subboundary_x(self, game_state):
+        x = game_state.data.layout.width // 2 + 1
+        if self.red:
+            x = x - 3
         return x
 
     # Establece los focos de patrulla.
@@ -373,14 +419,21 @@ class ExpectimaxAgent(CaptureAgent):
     #
 
     def observable_agents(self, game_state):
-        filtrum = lambda a: a.get_position() is not None
-        return list(filter(filtrum, self.opponent_agents(game_state)))
+        agents = self.opponent_agents(game_state)
+        filtrum = lambda a: a.get_position() != None
+        observable = list(filter(filtrum, agents))
+        #print("obs", observable)
+        return observable
 
     def opponent_agents(self, game_state):
         agents = []
         for index in self.opponent_indices:
             agents.append(game_state.get_agent_state(index))
         return agents
+
+    def opponent_timers(self, game_state):
+        agents = self.opponent_agents(game_state)
+        return list(map(lambda a: a.scared_timer, agents))
 
     def print_opponents_info(self, game_state):
         for index in self.opponent_indices:
@@ -403,24 +456,17 @@ class ExpectimaxAgent(CaptureAgent):
         return agent.scared_timer > 0
 
     def are_some_opponents_scared(self, game_state):
-        agents = self.opponent_agents(game_state)
-        timers = list(map(lambda a: a.scared_timer, agents))
-        return max(timers) > 0
+        return max(self.opponent_timers(game_state)) > 0
 
     def are_all_opponents_scared(self, game_state):
-        agents = self.opponent_agents(game_state)
-        timers = list(map(lambda a: a.scared_timer, agents))
-        return min(timers) > 0
-
-    def has_crossed_boundary(self, game_state):
-        pass
+        return min(self.opponent_timers(games_state)) > 0
 
     def has_collided(self, game_state):
         return 0
         
     def is_at_home(self, game_state):
         agent = game_state.get_agent_state(self.index)
-        return agent.is_pacman
+        return not agent.is_pacman
 
     #
     # Objetivos
@@ -433,24 +479,28 @@ class ExpectimaxAgent(CaptureAgent):
 
         if name == "eat_cocos":
             return -(self.min_distance_cocos(game_state) + 100 * self.num_food(game_state) + 10000 * self.num_capsules(game_state))
+            #return -(self.min_distance_cocos(game_state) + 100 * self.num_cocos(game_state))
 
         if name == "eat_food":
             return -(self.min_distance_food(game_state) + 100 * self.num_food(game_state))
         
         if name == "flee_daring_ghosts":
-            return self.min_distance_observable_daring_ghosts(game_state)
+            return self.clap(self.min_distance_observable_daring_ghosts(game_state))
 
         if name == "flee_ghosts":
-            return self.min_distance_observable_ghosts(game_state)
+            return self.clap(self.min_distance_observable_ghosts(game_state))
 
         if name == "flee_pacmans":
-            return self.min_distance_observable_pacmans(game_state)
+            return self.clap(self.min_distance_observable_pacmans(game_state))
 
         if name == "go_boundary":
             return -self.min_distance_boundary(game_state)
 
         if name == "go_start":
             return -self.distance_to_start(game_state)
+
+        if name == "go_subboundary":
+            return -self.min_distance_subboundary(game_state)
 
         if name == "hunt_ghosts":
             return -(self.min_distance_observable_ghosts(game_state) + 1000 * self.has_collided(game_state))
@@ -461,14 +511,14 @@ class ExpectimaxAgent(CaptureAgent):
         if name == "hunt_pacmans":
             return -self.min_distance_observable_pacmans(game_state)
 
-        if name == "keep_at_home":
-            return 0
-
         if name == "patrol":
             return -self.min_distance_patrol_focuses(game_state)
 
         if name == "protect":
             return -self.min_distance_own_capsules(game_state)
+
+        if name == "stay_at_home":
+            return 1 if self.is_at_home(game_state) else -1
 
         print("Erroneus feature:", name)
         return 0
@@ -482,20 +532,35 @@ class OffensiveExpectimaxAgent(ExpectimaxAgent):
     def select_preferences(self, game_state):
         self.skip_stop = True
         self.extra_distance = 1
+        self.radius = 5
         self.capacity = 2
 
     def select_goals(self, game_state):
-        if self.are_some_opponents_scared(game_state):
-            self.goals = {"eat_food": 1, "hunt_ghosts": 100}
-            self.print_opponents_info(game_state)
+        if not self.is_fed(game_state):
+            self.goals = {"eat_cocos": 1, "flee_daring_ghosts": 1000, "hunt_scared_ghosts": 100}
+        else:
+            self.goals = {"go_subboundary": 1, "flee_daring_ghosts": 1000, "hunt_scared_ghosts": 100}
+
+
+    def select_goals_v0(self, game_state):
+        if self.are_all_opponents_scared(game_state):
+            if not self.is_fed(game_state):
+                #self.goals = {"eat_cocos": 1, "flee_daring_ghosts": 1000, "hunt_scared_ghosts": 100}
+                self.goals = {"eat_cocos": 1, "hunt_scared_ghosts": 100}
+                #self.goals = {"eat_capsules": 1, "flee_ghosts": 100}
+            else:
+                #self.goals = {"go_boundary": 1, "flee_daring_ghosts": 1000, "hunt_scared_ghosts": 100}
+                self.goals = {"go_subboundary": 1, "hunt_scared_ghosts": 100}
+ 
         else:
             if not self.is_fed(game_state):
                 #self.goals = {"eat_cocos": 1, "flee_daring_ghosts": 1000, "hunt_scared_ghosts": 100}
-                #self.goals = {"eat_cocos": 1, "flee_ghosts": 100}
-                self.goals = {"eat_capsules": 1, "flee_ghosts": 100}
+                self.goals = {"eat_cocos": 1, "flee_daring_ghosts": 100}
+                #self.goals = {"eat_capsules": 1, "flee_ghosts": 100}
             else:
                 #self.goals = {"go_boundary": 1, "flee_daring_ghosts": 1000, "hunt_scared_ghosts": 100}
-                self.goals = {"go_boundary": 1, "flee_ghosts": 100}
+                self.goals = {"go_subboundary": 1, "flee_daring_ghosts": 100}
+        #print(self.goals)
 
 #
 # Agente defensivo
@@ -505,10 +570,12 @@ class DefensiveExpectimaxAgent(ExpectimaxAgent):
     def select_preferences(self, game_state):
         self.skip_stop = True
         self.extra_distance = 1
+        self.radius = 5
         self.capacity = 0
 
     def select_goals(self, game_state):
         if not self.is_scared(game_state):
-            self.goals = {"patrol": 1, "hunt_pacmans": 100}
+            self.goals = {"patrol": 1, "hunt_pacmans": 100, "stay_at_home": 10000}
         else:
-            self.goals = {"patrol": 1, "flee_pacmans": 100}
+            self.goals = {"patrol": 1, "flee_pacmans": 100, "stay_at_home": 10000}
+

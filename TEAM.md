@@ -1,8 +1,8 @@
 # Team Information
 
-**Course:** _[fill your course code and name]_
+**Course:** _Artificial Intelligence - UPF_
 
-**Semester:** Semester _2_, _2024_
+**Semester:** Semester _1_, _2024_
 
 **Instructor:** _Sergio Calo_
 
