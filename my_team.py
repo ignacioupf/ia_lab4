@@ -662,32 +662,6 @@ class ExpectimaxAgent(CaptureAgent):
         return not agent.is_pacman
 
     #
-    def good_collision(self, game_state, opponent_index):
-        # Agentes
-        agent = game_state.get_agent_state(self.index)
-        opponent_agent = game_state.get_agent_state(opponent_index)
-        
-        # Si no se está en la misma posición...
-        if opponent_agent.get_position() is None:
-            return 0
-        if opponent_agent.get_position() != agent.get_position():
-            return 0
-        
-        # Si uno mismo es pacman...
-        if agent.is_pacman:
-            if opponent_agent.is_pacman:
-                return 0
-            if opponent_agent.scared_timer <= 0:
-                return 0
-        
-        return 0
-
-    #
-    def bad_collision(self, game_state):
-        return 0
-
-
-    #
     # Objetivos
     #
     
@@ -725,7 +699,7 @@ class ExpectimaxAgent(CaptureAgent):
             return -self.min_distance_subboundary(game_state)
 
         if name == "hunt_ghosts":
-            return -(self.min_distance_observable_ghosts(game_state) + 1000 * self.good_collision(game_state))
+            return -self.min_distance_observable_ghosts(game_state)
 
         if name == "hunt_scared_ghosts":
             return -self.min_distance_observable_scared_ghosts(game_state)
