@@ -220,7 +220,7 @@ class ExpectimaxAgent(CaptureAgent):
         # Acciones posibles
         actions = game_state.get_legal_actions(opponent_index)
 
-        # Valores de los hijos.
+        # Valores de los hijos
         values = []
         for action in actions:
             successor = game_state.generate_successor(opponent_index, action)
@@ -373,11 +373,11 @@ class ExpectimaxAgent(CaptureAgent):
         agent_position = game_state.get_agent_position(self.index)
         return self.get_maze_distance(agent_position, target)
 
-    # Distancia a la guarida.
+    # Distancia a la guarida
     def distance_to_start(self, game_state):
         return self.distance(game_state, self.start)
 
-    # Calcular la distancia mínima entre este agente y un lista de posiciones.
+    # Calcular la distancia mínima entre este agente y un lista de posiciones
     def min_distance(self, game_state, positions, extra=0):
         agent_position = game_state.get_agent_position(self.index)
         distances = []
@@ -388,94 +388,68 @@ class ExpectimaxAgent(CaptureAgent):
             return 0
         return min(distances) + extra
 
-    # Mínima distancia a pacmans observables.
+    # Mínima distancia a oponentes observables
+    def min_distance_observables(self, game_state, filtrum):
+        agents = list(filter(filtrum, self.observable_agents(game_state)))
+        positions = list(map(lambda a: a.get_position(), agents))
+        return self.min_distance(game_state, positions, self.extra_distance)
+
+    # Mínima distancia a pacmans observables
     def min_distance_observable_pacmans(self, game_state):
-        agents = [game_state.get_agent_state(i) for i in self.opponent_indices]
-        positions = [a.get_position() for a in agents if a.get_position() != None and a.is_pacman == True]
-        return self.min_distance(game_state, positions, self.extra_distance)
+        filtrum = lambda a: a.is_pacman == True
+        return self.min_distance_observables(game_state, filtrum)
 
-    # Mínima distancia a fantasmas observables.
+    # Mínima distancia a fantasmas observables
     def min_distance_observable_ghosts(self, game_state):
-        agents = [game_state.get_agent_state(i) for i in self.opponent_indices]
-        positions = [a.get_position() for a in agents if a.get_position() != None and a.is_pacman == False]
-        return self.min_distance(game_state, positions, self.extra_distance)
+        filtrum = lambda a: a.is_pacman == False
+        return self.min_distance_observables(game_state, filtrum)
 
-    # Mínima distancia a fantasmas observables no asustados.
+    # Mínima distancia a fantasmas observables no asustados
     def min_distance_observable_daring_ghosts(self, game_state):
-        agents = [game_state.get_agent_state(i) for i in self.opponent_indices]
-        positions = [a.get_position() for a in agents if a.get_position() != None and a.is_pacman == False and a.scared_timer <= 0]
-        return self.min_distance(game_state, positions, self.extra_distance)
+        filtrum = lambda a: (a.is_pacman == False) and (a.scared_timer <= 0)
+        return self.min_distance_observables(game_state, filtrum)
 
-    # Mínima distancia a fantasmas observables asustados.
     def min_distance_observable_scared_ghosts(self, game_state):
-        agents = [game_state.get_agent_state(i) for i in self.opponent_indices]
-        positions = [a.get_position() for a in agents if a.get_position() != None and a.is_pacman == False and a.scared_timer > 0]
-        return self.min_distance(game_state, positions, self.extra_distance)
+        filtrum = lambda a: (a.is_pacman == False) and (a.scared_timer > 0)
+        return self.min_distance_observables(game_state, filtrum)
 
-
-#
-#    def min_distance_observables(self, game_state, filtrum):
-#        agents = list(filter(filtrum, self.observable_agents(game_state)))
-#        positions = list(map(lambda a: a.get_position(), agents))
-#        return self.min_distance(game_state, positions, self.extra_distance)
-#
-#    def min_distance_observable_all(self, game_state):
-#        filtrum = lambda a: True
-#        return self.min_distance_observables(game_state, filtrum)
-#
-#    def min_distance_observable_pacmans(self, game_state):
-#        filtrum = lambda a: a.is_pacman
-#        return self.min_distance_observables(game_state, filtrum)
-#
-#    def min_distance_observable_ghosts(self, game_state):
-#        filtrum = lambda a: a.is_pacman == False
-#        return self.min_distance_observables(game_state, filtrum)
-#
-#    def min_distance_observable_daring_ghosts(self, game_state):
-#        filtrum = lambda a: (a.is_pacman == False) and (a.scared_timer <= 0)
-#        return self.min_distance_observables(game_state, filtrum)
-#
-#    def min_distance_observable_scared_ghosts(self, game_state):
-#        filtrum = lambda a: (a.is_pacman == False) and (a.scared_timer > 0)
-#        return self.min_distance_observables(game_state, filtrum)
-
-    # Mínima distancia a la comida.
+    # Mínima distancia a la comida
     def min_distance_food(self, game_state):
         positions = self.get_food(game_state).as_list()
         return self.min_distance(game_state, positions)
 
-    # Mínima distancia a las cápsulas.
+    # Mínima distancia a las cápsulas
     def min_distance_capsules(self, game_state):
         positions = self.get_capsules(game_state)
         return self.min_distance(game_state, positions)
 
-    # Mínima distancia a los cocos (comida + cápsulas).
+    # Mínima distancia a los cocos (comida + cápsulas)
     def min_distance_cocos(self, game_state):
         positions = self.get_food(game_state).as_list() + self.get_capsules(game_state)
         return self.min_distance(game_state, positions)
 
     # Mínima distancia a los cocos (comida + cápsulas)
-    # que tiene una ruta sin obstáculos (oponentes observables).
+    # que tiene una ruta sin obstáculos (oponentes observables)
     def min_distance_unobstructive_cocos(self, game_state):
         positions = self.unobstructive_cocos
         return self.min_distance(game_state, positions)
 
-    # Mínima distancia a las cápsulas propias.
+    # Mínima distancia a las cápsulas propias
     def min_distance_own_capsules(self, game_state):
         positions = self.get_capsules_you_are_defending(game_state)
         return self.min_distance(game_state, positions, 1)
 
-    # Mínima distancia a los focos de patrulla.
+    # Mínima distancia a los focos de patrulla
     def min_distance_patrol_focuses(self, game_state):
         positions = self.patrol_focuses
         return self.min_distance(game_state, positions, 1)
 
-    # Mínima distancia a la frontera.
+    # Mínima distancia a la frontera
     def min_distance_boundary(self, game_state):
         positions = self.boundary
         return self.min_distance(game_state, positions)
 
-    # Mínima distancia a la subfrontera.
+    # Mínima distancia a la subfrontera
     def min_distance_subboundary(self, game_state):
         positions = self.subboundary
         return self.min_distance(game_state, positions)
@@ -490,22 +464,23 @@ class ExpectimaxAgent(CaptureAgent):
     # Cantidades
     #
 
-    # Cantidad de cápsulas.
+    # Cantidad de cápsulas
     def num_own_capsules(self, game_state):
         return len(self.get_capsules_you_are_defending(game_state))
 
-    # Cantidad de comida acarreada.
+    # Cantidad de comida acarreada
     def num_food_carrying(self, game_state):
         return game_state.get_agent_state(self.index).num_carrying
 
-    # Cantidad de comida.
+    # Cantidad de comida
     def num_food(self, game_state):
         return len(self.get_food(game_state).as_list())
 
-    # Cantidad de cápsulas.
+    # Cantidad de cápsulas
     def num_capsules(self, game_state):
         return len(self.get_capsules(game_state))
-        
+    
+    # Cantidad de cocos (comida + cápsulas)
     def num_cocos(self, game_state):
         return len(self.get_food(game_state).as_list() + self.get_capsules(game_state))
 
@@ -513,7 +488,7 @@ class ExpectimaxAgent(CaptureAgent):
     # Posiciones
     #
 
-    # Establecer frontera
+    # Establecer frontera.
     def set_boundary(self, game_state):
         x = self.get_boundary_x(game_state)
         ys = list(range(game_state.data.layout.height))
@@ -522,14 +497,14 @@ class ExpectimaxAgent(CaptureAgent):
             if not game_state.has_wall(x, y):
              self.boundary.append((x, y))
 
-    # Obtener abcisa de la frontera
+    # Obtener abcisa de la frontera.
     def get_boundary_x(self, game_state):
         x = game_state.data.layout.width // 2
         if self.red:
             x = x - 1
         return x
 
-    # Establecer subfrontera
+    # Establecer subfrontera.
     def set_subboundary(self, game_state):
         x = self.get_subboundary_x(game_state)
         ys = list(range(game_state.data.layout.height))
@@ -538,7 +513,7 @@ class ExpectimaxAgent(CaptureAgent):
             if not game_state.has_wall(x, y):
              self.subboundary.append((x, y))
 
-    # Obtener abcisa de la subfrontera
+    # Obtener abcisa de la subfrontera.
     def get_subboundary_x(self, game_state):
         x = game_state.data.layout.width // 2 + 1
         if self.red:
@@ -559,6 +534,7 @@ class ExpectimaxAgent(CaptureAgent):
             if len(positions) > 0:
                 self.patrol_focuses = positions
 
+    # Obtiene la comida interesante (la más cercana para el oponente).
     def get_interesting_food(self, game_state):
         food = self.get_food_you_are_defending(game_state).as_list()
         capsules = self.get_capsules_you_are_defending(game_state)
@@ -574,7 +550,7 @@ class ExpectimaxAgent(CaptureAgent):
                 interesting.append(positions[index])
         return interesting
 
-    # Averigua si se ha modificado la comida que se defiende.
+    # Averiguar si se ha modificado la comida que se defiende.
     def positions_food_modified(self, game_state):
         if self.is_first_turn(game_state):
             return []
@@ -582,7 +558,7 @@ class ExpectimaxAgent(CaptureAgent):
         current = self.get_food_you_are_defending(self.get_current_observation()).as_list()
         return self.list_difference(previous, current)
 
-    # Calcula la diferencia de dos listas.
+    # Calcular la diferencia de dos listas.
     def list_difference(self, list_a, list_b):
         list_c = []
         for a in list_a:
@@ -590,6 +566,7 @@ class ExpectimaxAgent(CaptureAgent):
                 list_c.append(a)
         return list_c
 
+    # Obtener aquellos cocos cuya ruta no está obstruida (es decir no hay oponentes en ella).
     def set_unobstructive_cocos(self, game_state):
         cocos = self.get_food(game_state).as_list() + self.get_capsules(game_state)
         if self.calculate_unobstructive == False:
@@ -602,6 +579,7 @@ class ExpectimaxAgent(CaptureAgent):
             if self.is_reachable(game_state, origin, coco, obstacles):
                 self.unobstructive_cocos.append(coco)
 
+    # Verdadero si la ruta hacia la diana no tienen obstáculos.
     def is_reachable(self, game_state, origin, target, obstacles):
             path = self.a_star(game_state, origin, target)
             if len(path) == 0:
@@ -611,6 +589,7 @@ class ExpectimaxAgent(CaptureAgent):
                     return False
             return True
 
+    # Distancia de la ruta si no tiene obtáculos
     def reachable_distance(self, game_state, origin, target, obstacles):
             far = 999
             path = self.a_star(game_state, origin, target)
@@ -656,36 +635,63 @@ class ExpectimaxAgent(CaptureAgent):
     # Condiciones
     #
     
+    # Verdadero si es el primer turno de la partida
     def is_first_turn(self, game_state):
         return self.get_previous_observation() is None
 
+    # Verdadero si el agente ha llegado a su capacidad de acarrear comida
     def is_fed(self, game_state):
         return self.num_food_carrying(game_state) >= self.capacity
 
+    # Verdadero si el agente está asustado.
     def is_scared(self, game_state):
         agent = game_state.get_agent_state(self.index)
         return agent.scared_timer > 0
 
+    # Verdadero si alguno de los oponentes está asustado.
     def are_some_opponents_scared(self, game_state):
         return max(self.opponent_timers(game_state)) > 0
 
+    # Verdadero si todos los oponentes están assustados.
     def are_all_opponents_scared(self, game_state):
         return min(self.opponent_timers(games_state)) > 0
 
-    def good_collision(self, game_state):
-        return 0
-
-    def bad_collision(self, game_state):
-        return 0
-
+    # Verdadero si el agente está en casa (hemicampo propio)
     def is_at_home(self, game_state):
         agent = game_state.get_agent_state(self.index)
         return not agent.is_pacman
 
     #
+    def good_collision(self, game_state, opponent_index):
+        # Agentes
+        agent = game_state.get_agent_state(self.index)
+        opponent_agent = game_state.get_agent_state(opponent_index)
+        
+        # Si no se está en la misma posición...
+        if opponent_agent.get_position() is None:
+            return 0
+        if opponent_agent.get_position() != agent.get_position():
+            return 0
+        
+        # Si uno mismo es pacman...
+        if agent.is_pacman:
+            if opponent_agent.is_pacman:
+                return 0
+            if opponent_agent.scared_timer <= 0:
+                return 0
+        
+        return 0
+
+    #
+    def bad_collision(self, game_state):
+        return 0
+
+
+    #
     # Objetivos
     #
     
+    # Obtener característica para la función de evaluación según objetivo.
     def get_feature(self, game_state, name):
 
         if name == "eat_capsules":
@@ -746,14 +752,15 @@ class ExpectimaxAgent(CaptureAgent):
 class OffensiveExpectimaxAgent(ExpectimaxAgent):
 
     def select_preferences(self, game_state):
-        # El agente no para.
-        self.skip_stop = True
+        # El agente considera parar.
+        self.skip_stop = False
         # Se considera que los oponentes son semiagresivos.
         # (Se usa una mezcla de MINIMAX y EXPECTIMAX.)
         self.opponent_aggressivity = 0.5
         # Se patrullan inicialmente la comida interesante (la más cercana para el oponente).
         self.patrol_interesting = True
         # No se calculan las rutas sin obtáculos.
+        # (Tarda demasiado en computar.)
         self.calculate_unobstructive = False
         # Se añade una distancia extra a los oponentes.
         self.extra_distance = 1
@@ -784,14 +791,15 @@ class DefensiveExpectimaxAgent(ExpectimaxAgent):
 
     # Preferencias
     def select_preferences(self, game_state):
-        # El agente no para.
-        self.skip_stop = True
+        # El agente considera parar.
+        self.skip_stop = False
         # Se considera que los oponentes son semiagresivos.
         # (Se usa una mezcla de MINIMAX y EXPECTIMAX.)
         self.opponent_aggressivity = 0.5
         # Se patrullan inicialmente la comida interesante (la más cercana para el oponente).
         self.patrol_interesting = True
-        # No se calculan las rutas sin obtáculos
+        # No se calculan las rutas sin obtáculos.
+        # (Tarda demasiado en computar.)
         self.calculate_unobstructive = False
         # Se añade una distancia extra a los oponentes.
         self.extra_distance = 1
@@ -804,13 +812,13 @@ class DefensiveExpectimaxAgent(ExpectimaxAgent):
     def select_goals(self, game_state):
         if not self.is_scared(game_state):
             # Si no está asusado:
-            #   *  patrullar
+            #   *  patrullar (ir la comida más cercana para el openente o a la última comida modificada)
             #   *  cazar pacmans observables
             #   *  permanecer en casa
             self.goals = {"patrol": 1, "hunt_pacmans": 100, "stay_at_home": 1000000}
         else:
             # Si está asusado:
-            #   *  patrullar
+            #   *  patrullar (ir la comida más cercana para el openente o a la última comida modificada)
             #   *  huir de pacmans cercanos
             #   *  permanecer en casa
             self.goals = {"patrol": 1, "flee_pacmans": 100, "stay_at_home": 1000000}
