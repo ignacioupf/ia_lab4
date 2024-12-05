@@ -27,13 +27,14 @@ from capture_agents import CaptureAgent
 from game import Directions
 from util import nearest_point
 
+import time
 
 #################
 # Team creation #
 #################
 
 def create_team(first_index, second_index, is_red,
-                first='OffensiveExpectimaxAgent', second='DefensiveExpectimaxAgent', num_training=0):
+                first='OffensiveExpectiminimaxAgent', second='DefensiveExpectiminimaxAgent', num_training=0):
     """
     This function should return a list of two agents that will form the
     team, initialized using firstIndex and secondIndex as their agent
@@ -60,7 +61,7 @@ def create_team(first_index, second_index, is_red,
 # Agente abstracto
 # (Usa algoritmos EXPECTIMAX, MINIMAX y A*)
 #
-class ExpectimaxAgent(CaptureAgent):
+class ExpectiminimaxAgent(CaptureAgent):
 
     #
     # Inicilización
@@ -74,7 +75,7 @@ class ExpectimaxAgent(CaptureAgent):
         self.start = None
 
         # Profundidad del algoritmo EXPECTIMAX
-        self.depth = 3
+        self.depth = 2
 
         # Opción que indica que el algoritmo EXPECTIMAX no considera
         # que el agente MAX pueda estar estar parado.
@@ -108,12 +109,29 @@ class ExpectimaxAgent(CaptureAgent):
 
     # Elegir acción.
     def choose_action(self, game_state):
+        start_time = time.time()
+    
         # Seleccionamos estrategia a seguir.
         # (Influye en la función de evaluación).
         self.select_strategy(game_state)
     
         # Llamamos al algoritmo EXPECTIMAX.
-        return self.expectimax(game_state)
+        action = self.expectiminimax(game_state)
+
+        self.check_time(start_time)
+        
+        return action
+
+    def check_time(self, start_time):
+        end_time = time.time()
+        duration = end_time - start_time
+
+        ######
+        #if duration >= 0.3:
+        #    print("duration", duration, self.index)
+
+        if duration >= 0.9:
+            self.depth = 1
 
     # Seleccionar estrategia a seguir
     def select_strategy(self, game_state):
@@ -172,12 +190,12 @@ class ExpectimaxAgent(CaptureAgent):
         pass
 
     #
-    # Algoritmo EXPECTIMAX
+    # Algoritmo EXPECTIMINIMAX
     #
 
-    # Se llama al algoritmo EXPECTIMAX y se devuelve la mejor acción.
-    def expectimax(self, game_state):
-        value, action = self.max_node(game_state, 1)
+    # Se llama al algoritmo EXPECTIMINIMAX y se devuelve la mejor acción.
+    def expectiminimax(self, game_state):
+        value, action = self.max_node(game_state, 0)
         return action
     
     # Devuelve valor y acción del nodo MAX.
@@ -625,11 +643,11 @@ class ExpectimaxAgent(CaptureAgent):
         agents = self.opponent_agents(game_state)
         return list(map(lambda a: a.scared_timer, agents))
 
-    def print_opponents_info(self, game_state):
-        for index in self.opponent_indices:
-            agent = game_state.get_agent_state(index)
-            print(" is_pacman", agent.is_pacman, "position", agent.get_position(), "timer", agent.scared_timer, end="")
-        print()
+#    def print_opponents_info(self, game_state):
+#        for index in self.opponent_indices:
+#            agent = game_state.get_agent_state(index)
+#            print(" is_pacman", agent.is_pacman, "position", agent.get_position(), "timer", agent.scared_timer, end="")
+#        print()
 
     #
     # Condiciones
@@ -667,39 +685,18 @@ class ExpectimaxAgent(CaptureAgent):
     
     # Obtener característica para la función de evaluación según objetivo.
     def get_feature(self, game_state, name):
-
-        if name == "eat_capsules":
-            return -(self.min_distance_capsules(game_state) + 10000 * self.num_capsules(game_state))
-
+    
         if name == "eat_cocos":
             return -(self.min_distance_cocos(game_state) + 100 * self.num_food(game_state) + 100000 * self.num_capsules(game_state))
-
-        if name == "eat_food":
-            return -(self.min_distance_food(game_state) + 100 * self.num_food(game_state))
-
-        if name == "eat_unobstructive_cocos":
-            return -(self.min_distance_unobstructive_cocos(game_state) + 100 * self.num_food(game_state) + 100000 * self.num_capsules(game_state))
 
         if name == "flee_daring_ghosts":
             return self.ignore_far(self.min_distance_observable_daring_ghosts(game_state))
 
-        if name == "flee_ghosts":
-            return self.ignore_far(self.min_distance_observable_ghosts(game_state))
-
         if name == "flee_pacmans":
             return self.ignore_far(self.min_distance_observable_pacmans(game_state))
 
-        if name == "go_boundary":
-            return -self.min_distance_boundary(game_state)
-
-        if name == "go_start":
-            return -self.distance_to_start(game_state)
-
         if name == "go_subboundary":
             return -self.min_distance_subboundary(game_state)
-
-        if name == "hunt_ghosts":
-            return -self.min_distance_observable_ghosts(game_state)
 
         if name == "hunt_scared_ghosts":
             return -self.min_distance_observable_scared_ghosts(game_state)
@@ -710,24 +707,48 @@ class ExpectimaxAgent(CaptureAgent):
         if name == "patrol":
             return -self.min_distance_patrol_focuses(game_state)
 
-        if name == "protect":
-            return -self.min_distance_own_capsules(game_state)
-
         if name == "stay_at_home":
             return 1 if self.is_at_home(game_state) else -1
 
-        print("Erroneus feature:", name)
+        # Características descartadas:
+
+        if name == "eat_capsules":
+            return -(self.min_distance_capsules(game_state) + 10000 * self.num_capsules(game_state))
+
+        if name == "eat_food":
+            return -(self.min_distance_food(game_state) + 100 * self.num_food(game_state))
+
+        if name == "eat_unobstructive_cocos":
+            return -(self.min_distance_unobstructive_cocos(game_state) + 100 * self.num_food(game_state) + 100000 * self.num_capsules(game_state))
+
+        if name == "flee_ghosts":
+            return self.ignore_far(self.min_distance_observable_ghosts(game_state))
+
+        if name == "go_boundary":
+            return -self.min_distance_boundary(game_state)
+
+        if name == "go_start":
+            return -self.distance_to_start(game_state)
+
+        if name == "hunt_ghosts":
+            return -self.min_distance_observable_ghosts(game_state)
+
+        if name == "protect":
+            return -self.min_distance_own_capsules(game_state)
+
+        #print("Erroneus feature:", name)
         return 0
 
 
 #
 # Agente ofensivo
 #
-class OffensiveExpectimaxAgent(ExpectimaxAgent):
+class OffensiveExpectiminimaxAgent(ExpectiminimaxAgent):
 
     def select_preferences(self, game_state):
-        # El agente considera parar.
-        self.skip_stop = False
+        # El agente no considera parar.
+        # (Se reduce un 35% el número de nodos).
+        self.skip_stop = True
         # Se considera que los oponentes son semiagresivos.
         # (Se usa una mezcla de MINIMAX y EXPECTIMAX.)
         self.opponent_aggressivity = 0.5
@@ -738,8 +759,8 @@ class OffensiveExpectimaxAgent(ExpectimaxAgent):
         self.calculate_unobstructive = False
         # Se añade una distancia extra a los oponentes.
         self.extra_distance = 1
-        # La distancia máxima de laberinto a la que se reacciona al huir es 5.
-        self.far_distance = 5
+        # La distancia máxima de laberinto a la que se reacciona al huir es 6.
+        self.far_distance = 6
         # Se recolecta comida de 1 en 1.
         self.capacity = 1
 
@@ -761,12 +782,13 @@ class OffensiveExpectimaxAgent(ExpectimaxAgent):
 #
 # Agente defensivo
 #
-class DefensiveExpectimaxAgent(ExpectimaxAgent):
+class DefensiveExpectiminimaxAgent(ExpectiminimaxAgent):
 
     # Preferencias
     def select_preferences(self, game_state):
-        # El agente considera parar.
-        self.skip_stop = False
+        # El agente no considera parar.
+        # (Se reduce un 35% el número de nodos).
+        self.skip_stop = True
         # Se considera que los oponentes son semiagresivos.
         # (Se usa una mezcla de MINIMAX y EXPECTIMAX.)
         self.opponent_aggressivity = 0.5
@@ -777,8 +799,8 @@ class DefensiveExpectimaxAgent(ExpectimaxAgent):
         self.calculate_unobstructive = False
         # Se añade una distancia extra a los oponentes.
         self.extra_distance = 1
-        # La distancia máxima de laberinto a la que se reacciona al huir es 5.
-        self.far_distance = 5
+        # La distancia máxima de laberinto a la que se reacciona al huir es 6.
+        self.far_distance = 6
         # No se recolecta comida.
         self.capacity = 0
 
