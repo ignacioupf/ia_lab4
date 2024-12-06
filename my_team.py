@@ -59,7 +59,7 @@ def create_team(first_index, second_index, is_red,
 
 #
 # Agente abstracto
-# (Usa algoritmos EXPECTIMAX, MINIMAX y A*)
+# (Usa algoritmos EXPECTIMINIMAX, MINIMAX y A*)
 #
 class ExpectiminimaxAgent(CaptureAgent):
 
@@ -71,13 +71,13 @@ class ExpectiminimaxAgent(CaptureAgent):
     def __init__(self, index, time_for_computing=.1):
         super().__init__(index, time_for_computing)
 
-        # Posición inicial del agente.
+        # Posición inicial de agente.
         self.start = None
 
-        # Profundidad del algoritmo EXPECTIMAX
+        # Profundidad del algoritmo EXPECTIMINIMAX
         self.depth = 2
 
-        # Opción que indica que el algoritmo EXPECTIMAX no considera
+        # Opción que indica que el algoritmo EXPECTIMINIMAX no considera
         # que el agente MAX pueda estar estar parado.
         # (Puede variar con la estrategia a seguir.)
         self.skip_stop = False
@@ -115,9 +115,10 @@ class ExpectiminimaxAgent(CaptureAgent):
         # (Influye en la función de evaluación).
         self.select_strategy(game_state)
     
-        # Llamamos al algoritmo EXPECTIMAX.
+        # Llamamos al algoritmo EXPECTIMINIMAX.
         action = self.expectiminimax(game_state)
 
+        # Comprobamos que no hayamos excedidor el tiempo límite.
         self.check_time(start_time)
         
         return action
@@ -126,9 +127,8 @@ class ExpectiminimaxAgent(CaptureAgent):
         end_time = time.time()
         duration = end_time - start_time
 
-        ######
         #if duration >= 0.3:
-        #    print("duration", duration, self.index)
+        #    print("duration", duration, self.index, self.role)
 
         if duration >= 0.9:
             self.depth = 1
@@ -152,8 +152,8 @@ class ExpectiminimaxAgent(CaptureAgent):
         self.skip_stop = False
         # Agresividad de los oponentes:
         #    1.0 -> Oponentes agresivos -> Se usa algorimo MINIMAX
-        #    0.0 -> Openentes aleatorios -> Se usa algortimo EXPECTIMAX
-        #    Entre 0.0 y 1.0 -> Oponentes semiagresivos -> Se usa una mezcla de MINIMAX y EXPECTIMAX
+        #    0.0 -> Openentes aleatorios -> Se usa algortimo EXPECTIMINIMAX
+        #    Entre 0.0 y 1.0 -> Oponentes semiagresivos -> Se usa una mezcla de MINIMAX y EXPECTIMINIMAX
         self.opponent_aggressivity = 0.5
         # Verdadero si el foco de patrulla inicial es la comida interesante (la más cercana para el oponente).
         # Falso si el foco de patrulla inicial son la posiciones de las cápsulas.
@@ -290,9 +290,9 @@ class ExpectiminimaxAgent(CaptureAgent):
 
     # Esperanza de una serie de valores.
     # La esperanza puede dar más peso al valor mínimo:
-    #   *  Importancia 0.0 -> EXPECTIMAX
+    #   *  Importancia 0.0 -> EXPECTIMINIMAX
     #   *  Importancia 1.0 -> MINIMAX
-    #   *  Importancia entre 0.0 y 1.0 -> Mezcla de EXPECTIMAX y MINIMAX
+    #   *  Importancia entre 0.0 y 1.0 -> Mezcla de EXPECTIMINIMAX y MINIMAX
     def expectation(self, values):
         average = sum(values) / len(values)
         minimum = min(values)
@@ -683,17 +683,23 @@ class ExpectiminimaxAgent(CaptureAgent):
     # Objetivos
     #
     
+    def feature_eat_cocos(self, game_state):
+        food = self.get_food(game_state).as_list()
+        capsules = self.get_capsules(game_state)
+        cocos = food + capsules
+        return -(self.min_distance(game_state, cocos) + 100 * len(food) + 100000 * len(capsules))
+        #return -(self.min_distance_cocos(game_state) + 100 * self.num_food(game_state) + 100000 * self.num_capsules(game_state))
+    
     # Obtener característica para la función de evaluación según objetivo.
     def get_feature(self, game_state, name):
     
+        # Características ofensivas:
+    
         if name == "eat_cocos":
-            return -(self.min_distance_cocos(game_state) + 100 * self.num_food(game_state) + 100000 * self.num_capsules(game_state))
-
+            return self.feature_eat_cocos(game_state)
+            
         if name == "flee_daring_ghosts":
             return self.ignore_far(self.min_distance_observable_daring_ghosts(game_state))
-
-        if name == "flee_pacmans":
-            return self.ignore_far(self.min_distance_observable_pacmans(game_state))
 
         if name == "go_subboundary":
             return -self.min_distance_subboundary(game_state)
@@ -701,11 +707,16 @@ class ExpectiminimaxAgent(CaptureAgent):
         if name == "hunt_scared_ghosts":
             return -self.min_distance_observable_scared_ghosts(game_state)
 
-        if name == "hunt_pacmans":
-            return -self.min_distance_observable_pacmans(game_state)
+        # Características defensivas:
 
         if name == "patrol":
             return -self.min_distance_patrol_focuses(game_state)
+
+        if name == "flee_pacmans":
+            return self.ignore_far(self.min_distance_observable_pacmans(game_state))
+
+        if name == "hunt_pacmans":
+            return -self.min_distance_observable_pacmans(game_state)
 
         if name == "stay_at_home":
             return 1 if self.is_at_home(game_state) else -1
@@ -746,11 +757,12 @@ class ExpectiminimaxAgent(CaptureAgent):
 class OffensiveExpectiminimaxAgent(ExpectiminimaxAgent):
 
     def select_preferences(self, game_state):
+        self.role = "offensive"
         # El agente no considera parar.
         # (Se reduce un 35% el número de nodos).
         self.skip_stop = True
         # Se considera que los oponentes son semiagresivos.
-        # (Se usa una mezcla de MINIMAX y EXPECTIMAX.)
+        # (Se usa una mezcla de MINIMAX y EXPECTIMINIMAX.)
         self.opponent_aggressivity = 0.5
         # Se patrullan inicialmente la comida interesante (la más cercana para el oponente).
         self.patrol_interesting = True
@@ -786,11 +798,12 @@ class DefensiveExpectiminimaxAgent(ExpectiminimaxAgent):
 
     # Preferencias
     def select_preferences(self, game_state):
+        self.role = "defensive"
         # El agente no considera parar.
         # (Se reduce un 35% el número de nodos).
         self.skip_stop = True
         # Se considera que los oponentes son semiagresivos.
-        # (Se usa una mezcla de MINIMAX y EXPECTIMAX.)
+        # (Se usa una mezcla de MINIMAX y EXPECTIMINIMAX.)
         self.opponent_aggressivity = 0.5
         # Se patrullan inicialmente la comida interesante (la más cercana para el oponente).
         self.patrol_interesting = True
