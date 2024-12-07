@@ -73,14 +73,9 @@ class ExpectiminimaxAgent(CaptureAgent):
 
         # Posición inicial de agente.
         self.start = None
-
-        # Profundidad del algoritmo EXPECTIMINIMAX
-        self.depth = 2
-
-        # Opción que indica que el algoritmo EXPECTIMINIMAX no considera
-        # que el agente MAX pueda estar estar parado.
-        # (Puede variar con la estrategia a seguir.)
-        self.skip_stop = False
+        
+        # Verdadero si imprime avisos.
+        self.verbose = False
 
     # Se ejecuta al inicio de cada partida.
     def register_initial_state(self, game_state):
@@ -93,6 +88,9 @@ class ExpectiminimaxAgent(CaptureAgent):
         # (Se comenta porque ya ha sido llamado en la superclase.)
         # self.distancer.get_maze_distances()
 
+        # Profundidad del algoritmo EXPECTIMINIMAX
+        self.depth = 2
+
         # Índices de los oponentes
         self.opponent_indices = self.get_opponents(game_state)
         
@@ -102,6 +100,46 @@ class ExpectiminimaxAgent(CaptureAgent):
         # Frontera
         self.set_boundary(game_state)
         self.set_subboundary(game_state)
+
+        # Focos de patrulla
+        self.patrol_focuses = []
+ 
+        # Cocos con ruta sin obstáculos.
+        self.unobstructive_cocos = []
+
+        # Establecer preferencias
+        self.default_preferences(game_state)
+        self.select_preferences(game_state)
+
+    # Preferencias por defecto.
+    def default_preferences(self, game_state):
+        # Rol del agente
+        self.role = "-"
+        # Verdadero si el agente MAX no para nunca.
+        self.skip_stop = False
+        # Agresividad de los oponentes:
+        #    1.0 -> Oponentes agresivos -> Se usa algorimo MINIMAX
+        #    0.0 -> Openentes aleatorios -> Se usa algortimo EXPECTIMINIMAX
+        #    Entre 0.0 y 1.0 -> Oponentes semiagresivos -> Se usa una mezcla de MINIMAX y EXPECTIMINIMAX
+        self.opponent_aggressivity = 0.5
+        # Verdadero si se calculan los focos de patrulla.
+        self.calculate_patrol = True
+        # Verdadero si el foco de patrulla inicial es la comida interesante (la más cercana para el oponente).
+        # Falso si el foco de patrulla inicial son la posiciones de las cápsulas.
+        self.patrol_interesting = True
+        # Verdadero si se calculan las rutas que no tienen obstáculos.
+        self.calculate_unobstructive = False
+        # Distancia extra que se suma a la distancia de los oponentes.
+        self.extra_distance = 0
+        # Distancia de laberinto a partir de la cual no se consideran los oponentes.
+        self.far_distance = 5
+        # Cantidad máxima de comida a cargar.
+        self.capacity = 0
+
+    # Preferencias de la subclase.
+    # (Método a sobreescribir por la subclase.)
+    def select_preferences(self, game_state):
+        pass
 
     #
     # Acción elegida
@@ -123,22 +161,23 @@ class ExpectiminimaxAgent(CaptureAgent):
         
         return action
 
+    # Comprobar que no hemos excedido el tiempo permitido.
     def check_time(self, start_time):
         end_time = time.time()
         duration = end_time - start_time
 
-        #if duration >= 0.3:
-        #    print("duration", duration, self.index, self.role)
-
-        if duration >= 0.9:
+        # Si hemos superado el tiempo permitido,
+        # reducimos la profundidad del algoritmo EXPECTIMINIMAX.
+        if duration >= 0.8:
             self.depth = 1
+
+        # Imprimimos duración
+        if self.verbose == True:
+            if duration >= 0.3:
+                print("duration", duration, self.index, self.role)
 
     # Seleccionar estrategia a seguir
     def select_strategy(self, game_state):
-        # Establecer preferencias
-        self.default_preferences(game_state)
-        self.select_preferences(game_state)
-        
         # Analizar estado del juego
         self.analize_state(game_state)
         
@@ -146,38 +185,15 @@ class ExpectiminimaxAgent(CaptureAgent):
         self.default_goals(game_state)
         self.select_goals(game_state)
 
-    # Preferencias por defecto.
-    def default_preferences(self, game_state):
-        # Verdadero si el agente MAX no para nunca.
-        self.skip_stop = False
-        # Agresividad de los oponentes:
-        #    1.0 -> Oponentes agresivos -> Se usa algorimo MINIMAX
-        #    0.0 -> Openentes aleatorios -> Se usa algortimo EXPECTIMINIMAX
-        #    Entre 0.0 y 1.0 -> Oponentes semiagresivos -> Se usa una mezcla de MINIMAX y EXPECTIMINIMAX
-        self.opponent_aggressivity = 0.5
-        # Verdadero si el foco de patrulla inicial es la comida interesante (la más cercana para el oponente).
-        # Falso si el foco de patrulla inicial son la posiciones de las cápsulas.
-        self.patrol_interesting = True
-        # Verdadero si se calculan las rutas que no tienen obstáculos.
-        self.calculate_unobstructive = False
-        # Distancia extra que se suma a la distancia de los oponentes.
-        self.extra_distance = 0
-        # Distancia de laberinto a partir de la cual no se consideran los oponentes.
-        self.far_distance = 5
-        # Cantidad máxima de comida a cargar.
-        self.capacity = 0
-
-    # Preferencias de la subclase.
-    # (Método a sobreescribir por la subclase.)
-    def select_preferences(self, game_state):
-        pass
-
     # Analizar estado.
     def analize_state(self, game_state):
         # Estabelcer los focos de patrulla.
-        self.set_patrol_focuses(game_state)
+        if self.calculate_patrol == True:
+            self.set_patrol_focuses(game_state)
+            
         # Establecer que cocos tienen una ruta sin obstáculos (oponentes observables).
-        self.set_unobstructive_cocos(game_state)
+        if self.calculate_unobstructive == True:
+            self.set_unobstructive_cocos(game_state)
 
     # Objetivos por defecto.
     def default_goals(self, game_state):
@@ -213,7 +229,7 @@ class ExpectiminimaxAgent(CaptureAgent):
         values = []
         for action in actions:
             successor = game_state.generate_successor(self.index, action)
-            # successor = self.get_successor(game_state, action) ###################
+            #successor = self.get_successor(game_state, self.index, action)
             value = self.chance_node(successor, 0, depth)
             values.append(value)
         
@@ -242,6 +258,7 @@ class ExpectiminimaxAgent(CaptureAgent):
         values = []
         for action in actions:
             successor = game_state.generate_successor(opponent_index, action)
+            #successor = self.get_successor(game_state, oponent_index, action)
             value = self.child_of_chance_node(successor, next_opponent, depth)
             values.append(value)
 
@@ -273,6 +290,16 @@ class ExpectiminimaxAgent(CaptureAgent):
     def is_not_observable(self, game_state, opponent_index):
         position = game_state.get_agent_state(opponent_index).get_position()
         return position is None
+
+    # Ecncuentra el sucesor en posición de cuadrícula.
+    def get_successor(self, game_state, agent_index, action):
+        successor = game_state.generate_successor(agent_index, action)
+        pos = successor.get_agent_state(agent_index).get_position()
+        if pos != nearest_point(pos):
+            # Solamente se ha cubierto la mitad de la posición.
+            return successor.generate_successor(self.index, action)
+        else:
+            return successor
 
     # Obtener uno de las mejores pares valor-acción
     def best_pair(self, values, actions):
@@ -316,7 +343,7 @@ class ExpectiminimaxAgent(CaptureAgent):
                 self.parent = parent
                 self.cost = cost if parent is None else cost + parent.cost
 
-            # Obtener ruta
+            # Obtener ruta.
             def get_path(self):
                 path = []
                 current_node = self
@@ -383,6 +410,28 @@ class ExpectiminimaxAgent(CaptureAgent):
         return []
 
     #
+    # Listas
+    #
+
+    # Devuelve mínimo de una lista o cero si está vacía.
+    def minimun(self, list):
+        if len(list) == 0:
+            return 0
+        return min(list)
+
+    # Devuelve máximo de una lista o cero se está vacía.
+    def maximum(self, list):
+        if len(list) == 0:
+            return 0
+        return max(list)
+
+    # Devuelve media aritmética de una lista o cero si está vacía.
+    def average(self, list):
+        if len(list) == 0:
+            return 0
+        return sum(list) / len(list)
+
+    #
     # Distancias
     #
 
@@ -395,7 +444,7 @@ class ExpectiminimaxAgent(CaptureAgent):
     def distance_to_start(self, game_state):
         return self.distance(game_state, self.start)
 
-    # Calcular la distancia mínima entre este agente y un lista de posiciones
+    # Calcular la distancia mínima entre este agente y un lista de posiciones.
     def min_distance(self, game_state, positions, extra=0):
         agent_position = game_state.get_agent_position(self.index)
         distances = []
@@ -427,6 +476,7 @@ class ExpectiminimaxAgent(CaptureAgent):
         filtrum = lambda a: (a.is_pacman == False) and (a.scared_timer <= 0)
         return self.min_distance_observables(game_state, filtrum)
 
+    # Mínima distancia a fantasmas observables asustados
     def min_distance_observable_scared_ghosts(self, game_state):
         filtrum = lambda a: (a.is_pacman == False) and (a.scared_timer > 0)
         return self.min_distance_observables(game_state, filtrum)
@@ -561,7 +611,7 @@ class ExpectiminimaxAgent(CaptureAgent):
         for position in positions:
             distance = self.get_maze_distance(self.opponent_start, position)
             distances.append(distance)
-        min_distance = min(distances)
+        min_distance = self.minimun(distances)
         interesting = []
         for index in range(len(positions)):
             if distances[index] == min_distance:
@@ -587,9 +637,6 @@ class ExpectiminimaxAgent(CaptureAgent):
     # Obtener aquellos cocos cuya ruta no está obstruida (es decir no hay oponentes en ella).
     def set_unobstructive_cocos(self, game_state):
         cocos = self.get_food(game_state).as_list() + self.get_capsules(game_state)
-        if self.calculate_unobstructive == False:
-            self.unobstructive_cocos = cocos
-            return
         obstacles = self.observable_positions(game_state)
         origin = game_state.get_agent_state(self.index).get_position()
         self.unobstructive_cocos = []
@@ -622,42 +669,47 @@ class ExpectiminimaxAgent(CaptureAgent):
     # Info oponentes
     #
 
+    # Agentes observables
     def observable_agents(self, game_state):
         agents = self.opponent_agents(game_state)
         filtrum = lambda a: a.get_position() != None
         observable = list(filter(filtrum, agents))
         return observable
 
+    # Agentes oponentes
     def opponent_agents(self, game_state):
         agents = []
         for index in self.opponent_indices:
             agents.append(game_state.get_agent_state(index))
         return agents
 
+    # Posiciones de los agentes observables
     def observable_positions(self, game_state):
         agents = self.observable_agents(game_state)
         positions = list(map(lambda a: a.get_position(), agents))
         return positions
 
+    # Temporizadores de susto de los oponentes
     def opponent_timers(self, game_state):
         agents = self.opponent_agents(game_state)
         return list(map(lambda a: a.scared_timer, agents))
 
-#    def print_opponents_info(self, game_state):
-#        for index in self.opponent_indices:
-#            agent = game_state.get_agent_state(index)
-#            print(" is_pacman", agent.is_pacman, "position", agent.get_position(), "timer", agent.scared_timer, end="")
-#        print()
+    # Imprimir información de los oponentes.
+    def print_opponents_info(self, game_state):
+        for index in self.opponent_indices:
+            agent = game_state.get_agent_state(index)
+            print(" is_pacman", agent.is_pacman, "position", agent.get_position(), "timer", agent.scared_timer, end="")
+        print()
 
     #
     # Condiciones
     #
     
-    # Verdadero si es el primer turno de la partida
+    # Verdadero si es el primer turno de la partida.
     def is_first_turn(self, game_state):
         return self.get_previous_observation() is None
 
-    # Verdadero si el agente ha llegado a su capacidad de acarrear comida
+    # Verdadero si el agente ha llegado a su capacidad de acarrear comida.
     def is_fed(self, game_state):
         return self.num_food_carrying(game_state) >= self.capacity
 
@@ -668,13 +720,13 @@ class ExpectiminimaxAgent(CaptureAgent):
 
     # Verdadero si alguno de los oponentes está asustado.
     def are_some_opponents_scared(self, game_state):
-        return max(self.opponent_timers(game_state)) > 0
+        return self.maximum(self.opponent_timers(game_state)) > 0
 
     # Verdadero si todos los oponentes están assustados.
     def are_all_opponents_scared(self, game_state):
-        return min(self.opponent_timers(games_state)) > 0
+        return self.minimum(self.opponent_timers(games_state)) > 0
 
-    # Verdadero si el agente está en casa (hemicampo propio)
+    # Verdadero si el agente está en casa (hemicampo propio).
     def is_at_home(self, game_state):
         agent = game_state.get_agent_state(self.index)
         return not agent.is_pacman
@@ -683,6 +735,7 @@ class ExpectiminimaxAgent(CaptureAgent):
     # Objetivos
     #
     
+    # Característica de comer cocos (comida + cápsulas).
     def feature_eat_cocos(self, game_state):
         food = self.get_food(game_state).as_list()
         capsules = self.get_capsules(game_state)
@@ -747,7 +800,10 @@ class ExpectiminimaxAgent(CaptureAgent):
         if name == "protect":
             return -self.min_distance_own_capsules(game_state)
 
-        #print("Erroneus feature:", name)
+        # Imprmir si se ha buscado una característica desconocida.
+        if self.verbose == True:
+            print("Erroneus feature:", name)
+        
         return 0
 
 
@@ -756,14 +812,18 @@ class ExpectiminimaxAgent(CaptureAgent):
 #
 class OffensiveExpectiminimaxAgent(ExpectiminimaxAgent):
 
+    # Preferencias
     def select_preferences(self, game_state):
+        # Rol del agente.
         self.role = "offensive"
         # El agente no considera parar.
-        # (Se reduce un 35% el número de nodos).
+        # (Se reduce un 35% el número de nodos del algoritmo EXPECTIMINIMAX.).
         self.skip_stop = True
         # Se considera que los oponentes son semiagresivos.
         # (Se usa una mezcla de MINIMAX y EXPECTIMINIMAX.)
         self.opponent_aggressivity = 0.5
+        # No se calculan los focos de patrulla porque es un agente ofensivo.
+        self.calculate_patrol = False
         # Se patrullan inicialmente la comida interesante (la más cercana para el oponente).
         self.patrol_interesting = True
         # No se calculan las rutas sin obtáculos.
@@ -776,6 +836,7 @@ class OffensiveExpectiminimaxAgent(ExpectiminimaxAgent):
         # Se recolecta comida de 1 en 1.
         self.capacity = 1
 
+    # Objetivos
     def select_goals(self, game_state):
         if not self.is_fed(game_state):
             # Si no ha recolectado suficiente comida:
@@ -798,13 +859,16 @@ class DefensiveExpectiminimaxAgent(ExpectiminimaxAgent):
 
     # Preferencias
     def select_preferences(self, game_state):
+        # Rol del agente
         self.role = "defensive"
         # El agente no considera parar.
-        # (Se reduce un 35% el número de nodos).
+        # (Se reduce un 35% el número de nodos del algoritmo EXPECTIMINIMAX.).
         self.skip_stop = True
         # Se considera que los oponentes son semiagresivos.
         # (Se usa una mezcla de MINIMAX y EXPECTIMINIMAX.)
         self.opponent_aggressivity = 0.5
+        # Se calculan los focos de patrulla porque es un agente defensivo.
+        self.calculate_patrol = True
         # Se patrullan inicialmente la comida interesante (la más cercana para el oponente).
         self.patrol_interesting = True
         # No se calculan las rutas sin obtáculos.
